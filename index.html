@@ -10,6 +10,7 @@
     <div class="container">
         <form id="todo-form">
             <input type="text" id="todo-input" placeholder="Yeni görev ekle..." autofocus>
+            <input type="datetime-local" id="todo-date">
             <button type="submit">Ekle</button>
         </form>
         <div class="columns">
@@ -223,8 +224,11 @@
             e.preventDefault();
             const text = input.value.trim();
             if (!text) return;
+            const dateInput = document.getElementById('todo-date');
+            const date = dateInput.value;
             input.value = '';
-            const todo = await dbInsert(text, '');
+            dateInput.value = '';
+            const todo = await dbInsert(text, date);
             renderTodo(todo);
         });
     </script>
