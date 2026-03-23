@@ -7,7 +7,37 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+
+    <!-- Auth Ekranı -->
+    <div class="auth-container" id="auth-screen">
+        <div class="auth-box">
+            <h1>Yapılacaklar</h1>
+            <p class="auth-subtitle" id="auth-subtitle">Hesabınıza giriş yapın</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Giriş Yap</button>
+                <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Kayıt Ol</button>
+            </div>
+
+            <form id="auth-form">
+                <input type="email" id="auth-email" placeholder="E-posta adresi" required>
+                <input type="password" id="auth-password" placeholder="Şifre (min. 6 karakter)" required minlength="6">
+                <button type="submit" id="auth-submit">Giriş Yap</button>
+            </form>
+
+            <p class="auth-message" id="auth-message"></p>
+        </div>
+    </div>
+
+    <!-- Uygulama Ekranı -->
+    <div class="container" id="app-screen" style="display:none;">
+        <div class="app-header">
+            <h1>Yapılacaklar</h1>
+            <div class="user-info">
+                <span id="user-email"></span>
+                <button id="logout-btn" onclick="logout()">Çıkış</button>
+            </div>
+        </div>
         <form id="todo-form">
             <input type="text" id="todo-input" placeholder="Yeni görev ekle..." autofocus>
             <input type="datetime-local" id="todo-date">
@@ -31,13 +61,177 @@
         const SUPABASE_URL = 'https://twdwhkcyxvehgzmuvkfq.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3ZHdoa2N5eHZlaGd6bXV2a2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNDg1NTYsImV4cCI6MjA4OTgyNDU1Nn0.o8ZOQEflMEo_KXqSAM3dbFEof4CFQRPSW4CqUeAnpbI';
         const API = `${SUPABASE_URL}/rest/v1/todos`;
-        const headers = {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
-        };
+        const AUTH = `${SUPABASE_URL}/auth/v1`;
 
+        let accessToken = null;
+        let refreshToken = null;
+        let currentUser = null;
+        let authMode = 'login';
+
+        function authHeaders() {
+            return {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            };
+        }
+
+        // ===== AUTH =====
+        function switchTab(mode) {
+            authMode = mode;
+            document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+            document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+            document.getElementById('auth-submit').textContent = mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol';
+            document.getElementById('auth-subtitle').textContent = mode === 'login' ? 'Hesabınıza giriş yapın' : 'Yeni hesap oluşturun';
+            document.getElementById('auth-message').textContent = '';
+        }
+
+        function showMessage(text, isError = true) {
+            const msg = document.getElementById('auth-message');
+            msg.textContent = text;
+            msg.className = 'auth-message ' + (isError ? 'error' : 'success');
+        }
+
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+
+            if (authMode === 'register') {
+                const res = await fetch(`${AUTH}/signup`, {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    if (data.identities && data.identities.length === 0) {
+                        showMessage('Bu e-posta zaten kayıtlı.', true);
+                    } else {
+                        showMessage('Kayıt başarılı! E-postanızı kontrol edin ve onay linkine tıklayın.', false);
+                    }
+                } else {
+                    showMessage(data.error_description || data.msg || 'Kayıt başarısız.', true);
+                }
+            } else {
+                const res = await fetch(`${AUTH}/token?grant_type=password`, {
+                    method: 'POST',
+                    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    saveSession(data);
+                    showApp(data.user);
+                } else {
+                    if (data.error_description && data.error_description.includes('not confirmed')) {
+                        showMessage('E-posta adresiniz henüz onaylanmadı. Lütfen e-postanızı kontrol edin.', true);
+                    } else {
+                        showMessage('E-posta veya şifre hatalı.', true);
+                    }
+                }
+            }
+        });
+
+        function saveSession(data) {
+            accessToken = data.access_token;
+            refreshToken = data.refresh_token;
+            currentUser = data.user;
+            localStorage.setItem('sb_session', JSON.stringify({
+                access_token: data.access_token,
+                refresh_token: data.refresh_token,
+                user: data.user
+            }));
+        }
+
+        async function refreshSession() {
+            const saved = JSON.parse(localStorage.getItem('sb_session'));
+            if (!saved || !saved.refresh_token) return false;
+            const res = await fetch(`${AUTH}/token?grant_type=refresh_token`, {
+                method: 'POST',
+                headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: saved.refresh_token })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                saveSession(data);
+                return true;
+            }
+            localStorage.removeItem('sb_session');
+            return false;
+        }
+
+        function logout() {
+            fetch(`${AUTH}/logout`, {
+                method: 'POST',
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${accessToken}` }
+            });
+            localStorage.removeItem('sb_session');
+            accessToken = null;
+            refreshToken = null;
+            currentUser = null;
+            document.getElementById('app-screen').style.display = 'none';
+            document.getElementById('auth-screen').style.display = 'flex';
+            pendingList.innerHTML = '';
+            doneList.innerHTML = '';
+        }
+
+        async function showApp(user) {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            document.getElementById('user-email').textContent = user.email;
+            pendingList.innerHTML = '';
+            doneList.innerHTML = '';
+            const todos = await dbFetchAll();
+            todos.forEach(renderTodo);
+            updateEmpty();
+        }
+
+        // ===== Sayfa yüklenince oturum kontrolü =====
+        (async () => {
+            // Email onay redirect'ini yakala
+            const hash = window.location.hash;
+            if (hash && hash.includes('access_token')) {
+                const params = new URLSearchParams(hash.substring(1));
+                const at = params.get('access_token');
+                const rt = params.get('refresh_token');
+                if (at) {
+                    const res = await fetch(`${AUTH}/user`, {
+                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${at}` }
+                    });
+                    if (res.ok) {
+                        const user = await res.json();
+                        saveSession({ access_token: at, refresh_token: rt, user });
+                        window.location.hash = '';
+                        showApp(user);
+                        return;
+                    }
+                }
+            }
+
+            const saved = JSON.parse(localStorage.getItem('sb_session'));
+            if (saved && saved.access_token) {
+                accessToken = saved.access_token;
+                refreshToken = saved.refresh_token;
+                currentUser = saved.user;
+                // Token hala geçerli mi kontrol et
+                const res = await fetch(`${AUTH}/user`, {
+                    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (res.ok) {
+                    showApp(currentUser);
+                } else if (await refreshSession()) {
+                    showApp(currentUser);
+                } else {
+                    document.getElementById('auth-screen').style.display = 'flex';
+                }
+            } else {
+                document.getElementById('auth-screen').style.display = 'flex';
+            }
+        })();
+
+        // ===== TODO APP =====
         const form = document.getElementById('todo-form');
         const input = document.getElementById('todo-input');
         const pendingList = document.getElementById('pending-list');
@@ -82,26 +276,26 @@
             updateEmpty();
         }
 
-        // Supabase API fonksiyonları
+        // Supabase API
         async function dbInsert(text, date) {
             const body = { text, done: false };
             if (date) body.date = new Date(date).toISOString();
-            const res = await fetch(API, { method: 'POST', headers, body: JSON.stringify(body) });
+            const res = await fetch(API, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
             const data = await res.json();
             return data[0];
         }
 
         async function dbUpdate(id, fields) {
             if (fields.date) fields.date = new Date(fields.date).toISOString();
-            await fetch(`${API}?id=eq.${id}`, { method: 'PATCH', headers, body: JSON.stringify(fields) });
+            await fetch(`${API}?id=eq.${id}`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify(fields) });
         }
 
         async function dbDelete(id) {
-            await fetch(`${API}?id=eq.${id}`, { method: 'DELETE', headers });
+            await fetch(`${API}?id=eq.${id}`, { method: 'DELETE', headers: authHeaders() });
         }
 
         async function dbFetchAll() {
-            const res = await fetch(`${API}?select=*&order=created_at.asc`, { headers });
+            const res = await fetch(`${API}?select=*&order=created_at.asc`, { headers: authHeaders() });
             return res.json();
         }
 
@@ -213,12 +407,6 @@
             }
             updateEmpty();
         }
-
-        // Sayfa yüklenince Supabase'den verileri çek
-        (async () => {
-            const todos = await dbFetchAll();
-            todos.forEach(renderTodo);
-        })();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
