@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yapılacaklar Listesi</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Yapılacaklar</h1>
+        <form id="todo-form">
+            <input type="text" id="todo-input" placeholder="Yeni görev ekle..." autofocus>
+            <button type="submit">Ekle</button>
+        </form>
+        <ul id="todo-list"></ul>
+        <p id="empty-msg">Henüz görev yok.</p>
+    </div>
+
+    <script>
+        const form = document.getElementById('todo-form');
+        const input = document.getElementById('todo-input');
+        const list = document.getElementById('todo-list');
+        const emptyMsg = document.getElementById('empty-msg');
+
+        function updateEmpty() {
+            emptyMsg.style.display = list.children.length === 0 ? 'block' : 'none';
+        }
+
+        function saveTodos() {
+            const todos = [];
+            list.querySelectorAll('li').forEach(li => {
+                todos.push({
+                    text: li.querySelector('span').textContent,
+                    done: li.classList.contains('done')
+                });
+            });
+            localStorage.setItem('todos', JSON.stringify(todos));
+        }
+
+        function addTodo(text, done = false) {
+            const li = document.createElement('li');
+            if (done) li.classList.add('done');
+
+            const span = document.createElement('span');
+            span.textContent = text;
+            span.addEventListener('click', () => {
+                li.classList.toggle('done');
+                saveTodos();
+            });
+
+            const actions = document.createElement('div');
+            actions.className = 'actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '✎';
+            editBtn.className = 'edit-btn';
+            editBtn.addEventListener('click', () => {
+                const editInput = document.createElement('input');
+                editInput.type = 'text';
+                editInput.className = 'edit-input';
+                editInput.value = span.textContent;
+
+                li.classList.add('editing');
+                li.insertBefore(editInput, actions);
+                editInput.focus();
+
+                function saveEdit() {
+                    const newText = editInput.value.trim();
+                    if (newText) span.textContent = newText;
+                    li.classList.remove('editing');
+                    editInput.remove();
+                    saveTodos();
+                }
+
+                editInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') saveEdit();
+                    if (e.key === 'Escape') {
+                        li.classList.remove('editing');
+                        editInput.remove();
+                    }
+                });
+                editInput.addEventListener('blur', saveEdit);
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '✕';
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.addEventListener('click', () => {
+                li.remove();
+                saveTodos();
+                updateEmpty();
+            });
+
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+            li.appendChild(span);
+            li.appendChild(actions);
+            list.appendChild(li);
+            updateEmpty();
+        }
+
+        // Kayıtlı görevleri yükle
+        const saved = JSON.parse(localStorage.getItem('todos') || '[]');
+        saved.forEach(t => addTodo(t.text, t.done));
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = input.value.trim();
+            if (!text) return;
+            addTodo(text);
+            saveTodos();
+            input.value = '';
+        });
+    </script>
+</body>
+</html>
