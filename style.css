@@ -10,24 +10,18 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 60px 20px;
+    padding: 40px 20px;
 }
 
 .container {
     width: 100%;
-    max-width: 500px;
-}
-
-h1 {
-    font-size: 2rem;
-    color: #1a1a2e;
-    margin-bottom: 24px;
+    max-width: 800px;
 }
 
 #todo-form {
     display: flex;
     gap: 8px;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
 }
 
 #todo-input {
@@ -59,35 +53,64 @@ h1 {
     background: #3a56d4;
 }
 
-#todo-list {
+.columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 600px) {
+    .columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.column h2 {
+    font-size: 1.25rem;
+    color: #1a1a2e;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.column:last-child h2 {
+    color: #2d6a4f;
+    border-bottom-color: #b7e4c7;
+}
+
+ul {
     list-style: none;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-#todo-list li {
+li {
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: #fff;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: opacity 0.2s;
+    transition: all 0.2s;
 }
 
-#todo-list li span {
+li span {
     cursor: pointer;
     flex: 1;
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: #333;
     transition: all 0.2s;
 }
 
-#todo-list li.done span {
+li.done {
+    background: #f0faf4;
+}
+
+li.done span {
     text-decoration: line-through;
-    color: #aaa;
+    color: #999;
 }
 
 .actions {
@@ -118,7 +141,7 @@ h1 {
     background: #fee;
 }
 
-#todo-list li.editing span {
+li.editing span {
     display: none;
 }
 
@@ -127,13 +150,13 @@ h1 {
     padding: 4px 8px;
     border: 2px solid #4361ee;
     border-radius: 6px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     outline: none;
 }
 
-#empty-msg {
+.empty-msg {
     text-align: center;
-    color: #aaa;
-    margin-top: 40px;
-    font-size: 0.95rem;
+    color: #bbb;
+    margin-top: 32px;
+    font-size: 0.9rem;
 }

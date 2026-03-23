@@ -8,34 +8,55 @@
 </head>
 <body>
     <div class="container">
-        <h1>Yapılacaklar</h1>
         <form id="todo-form">
             <input type="text" id="todo-input" placeholder="Yeni görev ekle..." autofocus>
             <button type="submit">Ekle</button>
         </form>
-        <ul id="todo-list"></ul>
-        <p id="empty-msg">Henüz görev yok.</p>
+        <div class="columns">
+            <div class="column">
+                <h2>Yapılacaklar</h2>
+                <ul id="pending-list"></ul>
+                <p class="empty-msg" id="pending-empty">Henüz görev yok.</p>
+            </div>
+            <div class="column">
+                <h2>Tamamlananlar</h2>
+                <ul id="done-list"></ul>
+                <p class="empty-msg" id="done-empty">Tamamlanan görev yok.</p>
+            </div>
+        </div>
     </div>
 
     <script>
         const form = document.getElementById('todo-form');
         const input = document.getElementById('todo-input');
-        const list = document.getElementById('todo-list');
-        const emptyMsg = document.getElementById('empty-msg');
+        const pendingList = document.getElementById('pending-list');
+        const doneList = document.getElementById('done-list');
+        const pendingEmpty = document.getElementById('pending-empty');
+        const doneEmpty = document.getElementById('done-empty');
 
         function updateEmpty() {
-            emptyMsg.style.display = list.children.length === 0 ? 'block' : 'none';
+            pendingEmpty.style.display = pendingList.children.length === 0 ? 'block' : 'none';
+            doneEmpty.style.display = doneList.children.length === 0 ? 'block' : 'none';
         }
 
         function saveTodos() {
             const todos = [];
-            list.querySelectorAll('li').forEach(li => {
+            document.querySelectorAll('li').forEach(li => {
                 todos.push({
                     text: li.querySelector('span').textContent,
                     done: li.classList.contains('done')
                 });
             });
             localStorage.setItem('todos', JSON.stringify(todos));
+        }
+
+        function moveToCorrectList(li) {
+            if (li.classList.contains('done')) {
+                doneList.appendChild(li);
+            } else {
+                pendingList.appendChild(li);
+            }
+            updateEmpty();
         }
 
         function addTodo(text, done = false) {
@@ -46,6 +67,7 @@
             span.textContent = text;
             span.addEventListener('click', () => {
                 li.classList.toggle('done');
+                moveToCorrectList(li);
                 saveTodos();
             });
 
@@ -96,7 +118,12 @@
             actions.appendChild(deleteBtn);
             li.appendChild(span);
             li.appendChild(actions);
-            list.appendChild(li);
+
+            if (done) {
+                doneList.appendChild(li);
+            } else {
+                pendingList.appendChild(li);
+            }
             updateEmpty();
         }
 
