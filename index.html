@@ -38,7 +38,7 @@
                 <button id="logout-btn" onclick="logout()">Çıkış</button>
             </div>
         </div>
-        <form id="todo-form">
+        <form id="todo-form" novalidate>
             <input type="text" id="todo-input" placeholder="Yeni görev ekle..." autofocus>
             <input type="datetime-local" id="todo-date">
             <button type="submit">Ekle</button>
@@ -413,11 +413,16 @@
             const text = input.value.trim();
             if (!text) return;
             const dateInput = document.getElementById('todo-date');
-            const date = dateInput.value;
+            const date = dateInput.value || '';
             input.value = '';
             dateInput.value = '';
             const todo = await dbInsert(text, date);
             renderTodo(todo);
+        });
+
+        // Tarih alanı boş bırakılabilsin, form validation'ı engelleme
+        document.getElementById('todo-date').addEventListener('invalid', (e) => {
+            e.preventDefault();
         });
     </script>
 </body>
