@@ -186,6 +186,8 @@
             const todos = await dbFetchAll();
             todos.forEach(renderTodo);
             updateEmpty();
+            requestNotificationPermission();
+            checkAlarms();
         }
 
         // ===== Sayfa yüklenince oturum kontrolü =====
@@ -266,6 +268,83 @@
         }
 
         setInterval(updateOverdue, 60000);
+
+        // ===== ALARM SİSTEMİ =====
+        const alarmFired = new Set(); // Aynı görev için tekrar alarm çalmasın
+
+        // Bildirim izni iste
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
+        function playAlarmSound() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.2);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.2 + 0.4);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime + i * 0.2);
+                osc.stop(ctx.currentTime + i * 0.2 + 0.4);
+            });
+        }
+
+        function showAlarmNotification(text) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Görev Zamanı!', {
+                    body: text,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⏰</text></svg>'
+                });
+            }
+        }
+
+        function showAlarmPopup(li, text) {
+            li.classList.add('alarm-active');
+            const existing = li.querySelector('.alarm-popup');
+            if (existing) existing.remove();
+
+            const popup = document.createElement('div');
+            popup.className = 'alarm-popup';
+            popup.innerHTML = '<span>⏰ Zamanı geldi!</span>';
+            const dismissBtn = document.createElement('button');
+            dismissBtn.textContent = 'Tamam';
+            dismissBtn.className = 'alarm-dismiss';
+            dismissBtn.addEventListener('click', () => {
+                popup.remove();
+                li.classList.remove('alarm-active');
+            });
+            popup.appendChild(dismissBtn);
+            li.appendChild(popup);
+        }
+
+        function checkAlarms() {
+            const now = new Date();
+            document.querySelectorAll('li[data-date]').forEach(li => {
+                if (li.classList.contains('done')) return;
+                const id = li.dataset.id;
+                if (alarmFired.has(id)) return;
+
+                const target = new Date(li.dataset.date);
+                const diff = target - now;
+                // Alarm: -60s ile +60s arasındaysa tetikle
+                if (diff <= 60000 && diff >= -60000) {
+                    alarmFired.add(id);
+                    const text = li.querySelector('.todo-text').textContent;
+                    playAlarmSound();
+                    showAlarmNotification(text);
+                    showAlarmPopup(li, text);
+                }
+            });
+        }
+
+        setInterval(checkAlarms, 10000); // Her 10 saniyede kontrol
 
         function moveToCorrectList(li) {
             if (li.classList.contains('done')) {
