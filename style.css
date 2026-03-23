@@ -25,20 +25,6 @@ body {
     flex-wrap: wrap;
 }
 
-#todo-date {
-    padding: 10px 12px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.2s;
-    color: #555;
-}
-
-#todo-date:focus {
-    border-color: #4361ee;
-}
-
 #todo-input {
     flex: 1;
     padding: 12px 16px;
@@ -159,6 +145,7 @@ li.overdue .todo-date {
     flex-shrink: 0;
 }
 
+.date-btn,
 .edit-btn,
 .delete-btn {
     background: none;
@@ -169,6 +156,11 @@ li.overdue .todo-date {
     padding: 4px 8px;
     border-radius: 4px;
     transition: all 0.2s;
+}
+
+.date-btn:hover {
+    color: #f77f00;
+    background: #fff3e0;
 }
 
 .edit-btn:hover {
@@ -192,6 +184,14 @@ li.editing .todo-content {
     border-radius: 6px;
     font-size: 0.95rem;
     outline: none;
+}
+
+.hidden-date-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .empty-msg {

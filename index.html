@@ -10,7 +10,6 @@
     <div class="container">
         <form id="todo-form">
             <input type="text" id="todo-input" placeholder="Yeni görev ekle..." autofocus>
-            <input type="datetime-local" id="todo-date">
             <button type="submit">Ekle</button>
         </form>
         <div class="columns">
@@ -108,15 +107,32 @@
 
             content.appendChild(span);
 
-            if (date) {
-                const dateEl = document.createElement('span');
-                dateEl.className = 'todo-date';
-                dateEl.textContent = formatDate(date);
-                content.appendChild(dateEl);
-            }
+            const dateEl = document.createElement('span');
+            dateEl.className = 'todo-date';
+            dateEl.textContent = date ? formatDate(date) : '';
+            content.appendChild(dateEl);
 
             const actions = document.createElement('div');
             actions.className = 'actions';
+
+            // Tarih seçici butonu
+            const dateBtn = document.createElement('button');
+            dateBtn.textContent = '🕐';
+            dateBtn.className = 'date-btn';
+            dateBtn.title = 'Tarih/saat ekle';
+            const hiddenDate = document.createElement('input');
+            hiddenDate.type = 'datetime-local';
+            hiddenDate.className = 'hidden-date-input';
+            if (date) hiddenDate.value = date;
+            dateBtn.addEventListener('click', () => {
+                hiddenDate.showPicker();
+            });
+            hiddenDate.addEventListener('change', () => {
+                li.dataset.date = hiddenDate.value;
+                dateEl.textContent = formatDate(hiddenDate.value);
+                updateOverdue();
+                saveTodos();
+            });
 
             const editBtn = document.createElement('button');
             editBtn.textContent = '✎';
@@ -158,6 +174,8 @@
                 updateEmpty();
             });
 
+            actions.appendChild(dateBtn);
+            actions.appendChild(hiddenDate);
             actions.appendChild(editBtn);
             actions.appendChild(deleteBtn);
             li.appendChild(content);
@@ -179,11 +197,9 @@
             e.preventDefault();
             const text = input.value.trim();
             if (!text) return;
-            const dateInput = document.getElementById('todo-date');
-            addTodo(text, false, dateInput.value);
+            addTodo(text);
             saveTodos();
             input.value = '';
-            dateInput.value = '';
         });
     </script>
 </body>
