@@ -27,6 +27,16 @@
     </div>
 
     <script>
+        const SUPABASE_URL = 'https://twdwhkcyxvehgzmuvkfq.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3ZHdoa2N5eHZlaGd6bXV2a2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNDg1NTYsImV4cCI6MjA4OTgyNDU1Nn0.o8ZOQEflMEo_KXqSAM3dbFEof4CFQRPSW4CqUeAnpbI';
+        const API = `${SUPABASE_URL}/rest/v1/todos`;
+        const headers = {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+        };
+
         const form = document.getElementById('todo-form');
         const input = document.getElementById('todo-input');
         const pendingList = document.getElementById('pending-list');
@@ -50,18 +60,6 @@
             return new Date(dateStr) < new Date();
         }
 
-        function saveTodos() {
-            const todos = [];
-            document.querySelectorAll('li').forEach(li => {
-                todos.push({
-                    text: li.querySelector('.todo-text').textContent,
-                    done: li.classList.contains('done'),
-                    date: li.dataset.date || ''
-                });
-            });
-            localStorage.setItem('todos', JSON.stringify(todos));
-        }
-
         function updateOverdue() {
             document.querySelectorAll('li[data-date]').forEach(li => {
                 if (!li.classList.contains('done')) {
@@ -83,12 +81,36 @@
             updateEmpty();
         }
 
-        function addTodo(text, done = false, date = '') {
+        // Supabase API fonksiyonları
+        async function dbInsert(text, date) {
+            const body = { text, done: false };
+            if (date) body.date = new Date(date).toISOString();
+            const res = await fetch(API, { method: 'POST', headers, body: JSON.stringify(body) });
+            const data = await res.json();
+            return data[0];
+        }
+
+        async function dbUpdate(id, fields) {
+            if (fields.date) fields.date = new Date(fields.date).toISOString();
+            await fetch(`${API}?id=eq.${id}`, { method: 'PATCH', headers, body: JSON.stringify(fields) });
+        }
+
+        async function dbDelete(id) {
+            await fetch(`${API}?id=eq.${id}`, { method: 'DELETE', headers });
+        }
+
+        async function dbFetchAll() {
+            const res = await fetch(`${API}?select=*&order=created_at.asc`, { headers });
+            return res.json();
+        }
+
+        function renderTodo(todo) {
             const li = document.createElement('li');
-            if (done) li.classList.add('done');
-            if (date) {
-                li.dataset.date = date;
-                if (!done && isOverdue(date)) li.classList.add('overdue');
+            li.dataset.id = todo.id;
+            if (todo.done) li.classList.add('done');
+            if (todo.date) {
+                li.dataset.date = todo.date;
+                if (!todo.done && isOverdue(todo.date)) li.classList.add('overdue');
             }
 
             const content = document.createElement('div');
@@ -96,26 +118,26 @@
 
             const span = document.createElement('span');
             span.className = 'todo-text';
-            span.textContent = text;
-            span.addEventListener('click', () => {
+            span.textContent = todo.text;
+            span.addEventListener('click', async () => {
+                const newDone = !li.classList.contains('done');
                 li.classList.toggle('done');
                 li.classList.remove('overdue');
                 moveToCorrectList(li);
-                saveTodos();
                 updateOverdue();
+                await dbUpdate(todo.id, { done: newDone });
             });
 
             content.appendChild(span);
 
             const dateEl = document.createElement('span');
             dateEl.className = 'todo-date';
-            dateEl.textContent = date ? formatDate(date) : '';
+            dateEl.textContent = todo.date ? formatDate(todo.date) : '';
             content.appendChild(dateEl);
 
             const actions = document.createElement('div');
             actions.className = 'actions';
 
-            // Tarih seçici butonu
             const dateBtn = document.createElement('button');
             dateBtn.textContent = '🕐';
             dateBtn.className = 'date-btn';
@@ -123,15 +145,15 @@
             const hiddenDate = document.createElement('input');
             hiddenDate.type = 'datetime-local';
             hiddenDate.className = 'hidden-date-input';
-            if (date) hiddenDate.value = date;
+            if (todo.date) hiddenDate.value = new Date(todo.date).toISOString().slice(0, 16);
             dateBtn.addEventListener('click', () => {
                 hiddenDate.showPicker();
             });
-            hiddenDate.addEventListener('change', () => {
+            hiddenDate.addEventListener('change', async () => {
                 li.dataset.date = hiddenDate.value;
                 dateEl.textContent = formatDate(hiddenDate.value);
                 updateOverdue();
-                saveTodos();
+                await dbUpdate(todo.id, { date: hiddenDate.value });
             });
 
             const editBtn = document.createElement('button');
@@ -149,10 +171,12 @@
 
                 function saveEdit() {
                     const newText = editInput.value.trim();
-                    if (newText) span.textContent = newText;
+                    if (newText) {
+                        span.textContent = newText;
+                        dbUpdate(todo.id, { text: newText });
+                    }
                     li.classList.remove('editing');
                     editInput.remove();
-                    saveTodos();
                 }
 
                 editInput.addEventListener('keydown', (e) => {
@@ -168,10 +192,10 @@
             const deleteBtn = document.createElement('button');
             deleteBtn.textContent = '✕';
             deleteBtn.className = 'delete-btn';
-            deleteBtn.addEventListener('click', () => {
+            deleteBtn.addEventListener('click', async () => {
                 li.remove();
-                saveTodos();
                 updateEmpty();
+                await dbDelete(todo.id);
             });
 
             actions.appendChild(dateBtn);
@@ -181,7 +205,7 @@
             li.appendChild(content);
             li.appendChild(actions);
 
-            if (done) {
+            if (todo.done) {
                 doneList.appendChild(li);
             } else {
                 pendingList.appendChild(li);
@@ -189,17 +213,19 @@
             updateEmpty();
         }
 
-        // Kayıtlı görevleri yükle
-        const saved = JSON.parse(localStorage.getItem('todos') || '[]');
-        saved.forEach(t => addTodo(t.text, t.done, t.date || ''));
+        // Sayfa yüklenince Supabase'den verileri çek
+        (async () => {
+            const todos = await dbFetchAll();
+            todos.forEach(renderTodo);
+        })();
 
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const text = input.value.trim();
             if (!text) return;
-            addTodo(text);
-            saveTodos();
             input.value = '';
+            const todo = await dbInsert(text, '');
+            renderTodo(todo);
         });
     </script>
 </body>
